@@ -1,2 +1,2 @@
 # flow-regression-analysis
-Project created in support of the Nebraska regression equations project.
+Project created in support of regression equation projects.
