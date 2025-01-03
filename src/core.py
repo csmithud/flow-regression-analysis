@@ -26,6 +26,8 @@ def rpt_to_parquet(rpt_list:str,gage_id:str,out_folder:pl.Path):
         feq_pattern = '(?<=<< Frequency Curve >>\n)[\s\S]+?(?=\n\n\n<<)'
         with open(str(rpt),'r') as c:
             content = c.read()
+        ##replace missing data with -9999
+        content = content.replace(' --- ','-9999 ')
         freq = re.search(feq_pattern,content)
         if not freq:
             print(f"No frequency data pattern found in {rpt} .skipping")
@@ -41,6 +43,8 @@ def rpt_to_parquet(rpt_list:str,gage_id:str,out_folder:pl.Path):
         name_raw = freq_text[:idx[0][0]]
         headers_raw = freq_text[idx[0][1]:idx[1][0]]
         data_raw = freq_text[idx[1][1]:idx[2][0]]
+
+
         #data name
         name = re.search('[^\\n]+',name_raw).group()
         #column headers
@@ -67,7 +71,7 @@ def rpt_to_parquet(rpt_list:str,gage_id:str,out_folder:pl.Path):
             line+=1
         #data
         
-        data_list = re.findall('[\w,]+[\s.(]{0,1}\w+\){0,1}',data_raw)
+        data_list = re.findall('[-\w,]+[\s.(]{0,1}\w+\){0,1}',data_raw)
         assert len(data_list)%len(cols_dict) == 0, f"columns and data don't align for {rpt}"
         for key, val in cols_dict.items():
             for j, fl in enumerate(data_list):
@@ -90,23 +94,34 @@ def rpt_to_parquet(rpt_list:str,gage_id:str,out_folder:pl.Path):
     df.to_parquet(out_folder/p_name)
     return None
 
-def find_rpt_link(x,rpts):
+def find_rpt_link(x:str,rpts_folder:pl.Path):
     """
     Description:
       searches through a list of links to find links with a certain ID in the name
     Input:
       x: gage id or other pattern
-      rpts: links to the output of a peakFQ analyses
+      rpts: links a folder with peakFQ analyses
     Returns: a string with a list of links that qualify separated by a "; "
     """
     out = ""
+    rpts = glob.glob(str(rpts_folder)+'/**/*.rpt', recursive=True)
     for lnk in rpts:
         if lnk.find(str(x)) >= 0:
             if out != '':
                 out+='; '
             out+=lnk
     if len(out) == 0:
-        return None
+        for lnk in rpts:
+            with open(str(lnk),'r') as c:
+                content = c.read()
+                if content.find(str(x))>= 0:
+                    if out != '':
+                        out+='; '
+                    out+=lnk
+        if len(out) == 0:
+            return None
+        else:
+            return out
     else:
         return out
     
